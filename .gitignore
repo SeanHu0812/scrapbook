@@ -3,3 +3,9 @@ node_modules
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# Convex — keep generated types (api.d.ts), ignore runtime bundles
+convex/_generated/*.js
+
+# Local env
+.env.local

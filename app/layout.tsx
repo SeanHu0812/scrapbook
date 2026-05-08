@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Patrick_Hand, Caveat, Gaegu } from "next/font/google";
 import "./globals.css";
+import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 
 const patrick = Patrick_Hand({
   weight: "400",
@@ -46,7 +47,9 @@ export default function RootLayout({
       lang="en"
       className={`${patrick.variable} ${caveat.variable} ${gaegu.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <ConvexClientProvider>{children}</ConvexClientProvider>
+      </body>
     </html>
   );
 }
