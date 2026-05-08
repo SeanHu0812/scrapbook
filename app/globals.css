@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #FFF9EF;
+  --color-coral: #F98592;
+  --color-pink: #F47D8E;
+  --color-blue: #CFE9FA;
+  --color-yellow: #FFEAB6;
+  --color-green: #CFE8C9;
+  --color-ink: #2F2A28;
+  --color-brown: #6C5A4E;
+  --color-border: #E8DCCB;
+
+  --color-pink-soft: #FCE4E7;
+  --color-blue-soft: #E5F2FB;
+  --color-yellow-soft: #FFF3D1;
+  --color-green-soft: #E2F0DD;
+
+  --font-hand: var(--font-patrick), "Patrick Hand", system-ui, sans-serif;
+  --font-script: var(--font-caveat), "Caveat", cursive;
+  --font-cute: var(--font-gaegu), "Gaegu", system-ui, sans-serif;
+
+  --shadow-paper: 0 1px 0 rgba(108, 90, 78, 0.06), 0 6px 14px -8px rgba(108, 90, 78, 0.18);
+  --shadow-card: 0 2px 0 rgba(232, 220, 203, 0.6), 0 10px 24px -16px rgba(108, 90, 78, 0.25);
+}
+
+html, body {
+  background: #F2E9D6;
+  color: var(--color-ink);
+  font-family: var(--font-hand);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Subtle paper grain on the page background — looks scrapbook-y. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(rgba(108, 90, 78, 0.06) 1px, transparent 1px),
+    radial-gradient(rgba(108, 90, 78, 0.04) 1px, transparent 1px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 1px 2px;
+  opacity: 0.7;
+}
+
+/* Phone frame paper texture — slightly darker dots inside the screen */
+.paper-grain {
+  background-image:
+    radial-gradient(rgba(108, 90, 78, 0.05) 1px, transparent 1px),
+    radial-gradient(rgba(108, 90, 78, 0.03) 1px, transparent 1px);
+  background-size: 4px 4px, 9px 9px;
+  background-position: 0 0, 2px 3px;
+}
+
+.scribble-underline {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 8'><path d='M2 5 Q 20 1 40 5 T 80 5 T 118 5' fill='none' stroke='%23F98592' stroke-width='2' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 6px;
+  padding-bottom: 4px;
+}
+
+.handwrite { font-family: var(--font-script); }
+.hand { font-family: var(--font-hand); }
+
+input, textarea, button { font-family: inherit; color: inherit; }
+button { cursor: pointer; }
+
+/* Scrollbars look noisy on a scrapbook UI — hide them for cards/lists. */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
