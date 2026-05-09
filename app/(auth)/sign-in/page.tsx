@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/ui/AuthShell";
@@ -9,6 +9,8 @@ import { useAuth } from "@/lib/convex";
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? "/home";
   const { signIn } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -31,7 +33,7 @@ export default function SignInPage() {
     setLoading(true);
     try {
       const result = await signIn("password", { email, password, flow: "signIn" });
-      if (result.signingIn) router.push("/home");
+      if (result.signingIn) router.push(next);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Couldn't sign in. Check your details and try again.");
     } finally {

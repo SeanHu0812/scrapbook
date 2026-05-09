@@ -1,5 +1,14 @@
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+
+export const getCurrentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    return ctx.db.get(userId);
+  },
+});
 
 // Idempotent — safe to call on every authenticated mount.
 // createOrUpdateUser in auth.ts normally handles creation; this is a
