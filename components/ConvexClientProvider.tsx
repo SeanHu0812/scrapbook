@@ -1,6 +1,6 @@
 "use client";
 
-import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import dynamic from "next/dynamic";
 import { convex } from "@/lib/convex";
 
@@ -9,9 +9,9 @@ const AuthInit = dynamic(() => import("./AuthInit"), { ssr: false });
 
 export function ConvexClientProvider({ children }: { children: React.ReactNode }) {
   return (
-    <ConvexAuthNextjsProvider client={convex}>
+    <ConvexAuthProvider client={convex}>
       <AuthInit />
       {children}
-    </ConvexAuthNextjsProvider>
+    </ConvexAuthProvider>
   );
 }
