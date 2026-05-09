@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const getCurrentUser = query({
@@ -8,6 +9,33 @@ export const getCurrentUser = query({
     if (!userId) return null;
     return ctx.db.get(userId);
   },
+});
+
+export const updateProfile = mutation({
+  args: {
+    name: v.string(),
+    avatarPreset: v.optional(v.string()),
+    avatarStorageId: v.optional(v.id("_storage")),
+  },
+  handler: async (ctx, { name, avatarPreset, avatarStorageId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    await ctx.db.patch(userId, { name, avatarPreset, avatarStorageId });
+  },
+});
+
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    return ctx.storage.generateUploadUrl();
+  },
+});
+
+export const getStorageUrl = query({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, { storageId }) => ctx.storage.getUrl(storageId),
 });
 
 // Idempotent — safe to call on every authenticated mount.
