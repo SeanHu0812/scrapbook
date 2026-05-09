@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMutation } from "convex/react";
+import { useMutation, useConvexAuth } from "convex/react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Loader2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -15,6 +15,11 @@ export default function OnboardingProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isFromInvite = searchParams.get("from") === "invite";
+  const { isLoading, isAuthenticated } = useConvexAuth();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) router.replace("/sign-up");
+  }, [isLoading, isAuthenticated, router]);
 
   const updateProfile = useMutation(api.users.updateProfile);
 
@@ -97,7 +102,7 @@ export default function OnboardingProfilePage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isLoading || !isAuthenticated}
             className="w-full flex items-center justify-center gap-2 rounded-2xl bg-coral py-3 hand text-[15px] font-semibold text-white shadow-sm disabled:opacity-60 transition active:scale-[0.98]"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" />}
