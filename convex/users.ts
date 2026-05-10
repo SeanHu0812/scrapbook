@@ -39,15 +39,31 @@ export const getStorageUrl = query({
 });
 
 // Idempotent — safe to call on every authenticated mount.
-// createOrUpdateUser in auth.ts normally handles creation; this is a
-// safety valve for sessions that predate the callback.
+// Creates the user doc if missing (safety valve), then auto-creates a solo
+// space + membership if the user has none yet.
 export const ensureProfile = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return;
     const existing = await ctx.db.get(userId);
-    if (existing) return;
-    await ctx.db.patch(userId, { name: "", email: "" });
+    // User doc is created by createOrUpdateUser in auth.ts. If somehow missing,
+    // we can't insert with a specific ID in Convex — bail out gracefully.
+    if (!existing) return;
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (membership) return;
+    const spaceId = await ctx.db.insert("spaces", {
+      name: "our little space",
+      createdBy: userId,
+      status: "solo",
+    });
+    await ctx.db.insert("memberships", {
+      spaceId,
+      userId,
+      joinedAt: Date.now(),
+    });
   },
 });

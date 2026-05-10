@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
@@ -11,7 +11,14 @@ export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/home";
-  const { signIn } = useAuth();
+  const { isAuthenticated, isLoading, signIn } = useAuth();
+  const justSignedInRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && justSignedInRef.current) {
+      router.push(next);
+    }
+  }, [isLoading, isAuthenticated, next, router]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +40,12 @@ export default function SignInPage() {
     setLoading(true);
     try {
       const result = await signIn("password", { email, password, flow: "signIn" });
-      if (result.signingIn) router.push(next);
+      if (!result.signingIn) {
+        setError("Sign-in didn't complete — please try again.");
+        return;
+      }
+      justSignedInRef.current = true;
+      router.push(next);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Couldn't sign in. Check your details and try again.");
     } finally {

@@ -7,7 +7,7 @@ export default function AuthInit() {
   const { isAuthenticated } = useConvexAuth();
   const ensureProfile = useMutation(api.users.ensureProfile);
   useEffect(() => {
-    if (isAuthenticated) ensureProfile();
+    if (isAuthenticated) ensureProfile().catch(console.error);
   }, [isAuthenticated, ensureProfile]);
   return null;
 }

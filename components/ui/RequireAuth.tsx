@@ -17,14 +17,18 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       router.replace(`/sign-in?next=${encodeURIComponent(pathname)}`);
       return;
     }
+    if (user === null && pathname !== "/onboarding/profile") {
+      router.replace("/onboarding/profile");
+      return;
+    }
     if (user !== undefined && user !== null && user.name === "" && pathname !== "/onboarding/profile") {
       router.replace("/onboarding/profile");
     }
   }, [isLoading, isAuthenticated, user, pathname, router]);
 
-  const profileIncomplete = user !== undefined && user !== null && user.name === "";
+  const profileIncomplete = user != null && user.name === "";
 
-  if (isLoading || !isAuthenticated || user === undefined || profileIncomplete) {
+  if (isLoading || !isAuthenticated || user === undefined || user === null || profileIncomplete) {
     return <AuthLoadingScreen />;
   }
 

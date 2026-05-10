@@ -35,6 +35,7 @@ export default defineSchema({
   spaces: defineTable({
     name: v.string(),
     createdBy: v.id("users"),
+    status: v.union(v.literal("solo"), v.literal("paired")),
   }),
 
   memberships: defineTable({

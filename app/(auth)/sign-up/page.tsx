@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/ui/AuthShell";
@@ -8,7 +8,16 @@ import { useAuth } from "@/lib/convex";
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { isAuthenticated, isLoading, signIn } = useAuth();
+  const justSignedUpRef = useRef(false);
+
+  // Fallback: if signIn resolved but router.push was overridden by the auth
+  // layout's render-null, watch for isAuthenticated becoming true.
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && justSignedUpRef.current) {
+      router.push("/onboarding/profile");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +39,12 @@ export default function SignUpPage() {
     setLoading(true);
     try {
       const result = await signIn("password", { email, password, flow: "signUp" });
-      if (result.signingIn) router.push("/onboarding/profile");
+      if (!result.signingIn) {
+        setError("Account created but sign-in failed — please sign in manually.");
+        return;
+      }
+      justSignedUpRef.current = true;
+      router.push("/onboarding/profile");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Couldn't create account. Try a different email.");
     } finally {
