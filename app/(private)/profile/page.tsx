@@ -1,14 +1,24 @@
+"use client";
+
 import Link from "next/link";
 import { Settings, ChevronRight, MapPin, Music2 } from "lucide-react";
+import { useSpace } from "@/lib/useSpace";
 import { PhoneFrame } from "@/components/ui/PhoneFrame";
 import { BottomNav } from "@/components/ui/BottomNav";
 import { Card } from "@/components/ui/Card";
-import { CoupleAvatars } from "@/components/ui/Avatar";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { PhotoPlaceholder } from "@/components/ui/PhotoPlaceholder";
 import { HeartTiny } from "@/components/decorations";
-import { couple, stats, favorites } from "@/lib/data";
+import { stats, favorites } from "@/lib/data";
 
 export default function ProfilePage() {
+  const { status, members } = useSpace();
+  const isSolo = status === "solo";
+  const nameDisplay =
+    members.length >= 2
+      ? `${members[0].name} & ${members[1].name}`
+      : members[0]?.name ?? "";
+
   return (
     <PhoneFrame withNav>
       <div className="flex items-center justify-between py-2">
@@ -24,14 +34,46 @@ export default function ProfilePage() {
 
       {/* Couple card */}
       <Card tint="white" className="mt-3 px-5 py-6 text-center">
-        <CoupleAvatars size={68} />
-        <p className="mt-3 hand text-[20px] font-semibold text-ink">
-          {couple.names.mia} & {couple.names.jake}
-        </p>
-        <p className="mt-1 text-[13px] text-brown">
-          Together for {couple.daysTogether} days{" "}
-          <HeartTiny className="inline h-3.5 w-3.5 align-baseline" />
-        </p>
+        <div className="flex justify-center items-center gap-3">
+          {members[0] && (
+            <UserAvatar
+              name={members[0].name}
+              avatarPreset={members[0].avatarPreset}
+              avatarUrl={members[0].avatarUrl}
+              size={68}
+            />
+          )}
+          {members.length >= 2 && (
+            <>
+              <svg width="22" height="20" viewBox="0 0 24 24" className="text-coral">
+                <path d="M12 21s-7-4.4-7-10.2C5 7.6 7.4 5.2 10.4 5.2c1.6 0 2.8.7 3.6 1.7C14.8 5.9 16 5.2 17.6 5.2 20.6 5.2 23 7.6 23 10.8 23 16.6 16 21 12 21z" fill="currentColor" />
+              </svg>
+              <UserAvatar
+                name={members[1].name}
+                avatarPreset={members[1].avatarPreset}
+                avatarUrl={members[1].avatarUrl}
+                size={68}
+              />
+            </>
+          )}
+          {members.length === 0 && (
+            <div className="h-[68px] w-[68px] rounded-full bg-border animate-pulse" />
+          )}
+        </div>
+        <p className="mt-3 hand text-[20px] font-semibold text-ink">{nameDisplay}</p>
+        {isSolo ? (
+          <p className="mt-1 text-[13px] text-brown/60">
+            it&apos;s just you for now —{" "}
+            <Link href="/onboarding/invite" className="text-coral underline">
+              invite your partner
+            </Link>
+          </p>
+        ) : (
+          <p className="mt-1 text-[13px] text-brown">
+            paired space{" "}
+            <HeartTiny className="inline h-3.5 w-3.5 align-baseline" />
+          </p>
+        )}
       </Card>
 
       {/* Stats */}

@@ -19,7 +19,7 @@ export const mySpace = query({
     const allMemberships = await ctx.db
       .query("memberships")
       .withIndex("by_space", (q) => q.eq("spaceId", space._id))
-      .collect();
+      .take(10);
 
     const members = (
       await Promise.all(

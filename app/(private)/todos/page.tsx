@@ -6,10 +6,14 @@ import { Plus, Calendar as CalIcon, Sparkles } from "lucide-react";
 import { PhoneFrame } from "@/components/ui/PhoneFrame";
 import { BackHeader } from "@/components/ui/BackHeader";
 import { Card } from "@/components/ui/Card";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 import { Avatar } from "@/components/ui/Avatar";
-import { todos as seed, categoryLabels, couple, type Todo } from "@/lib/data";
+import { useSpace } from "@/lib/useSpace";
+import { todos as seed, categoryLabels, type Todo } from "@/lib/data";
 
 export default function TodosPage() {
+  const { status, members } = useSpace();
+  const isSolo = status === "solo";
   const [list, setList] = useState<Todo[]>(seed);
   const [newTitle, setNewTitle] = useState("");
 
@@ -44,10 +48,27 @@ export default function TodosPage() {
       {/* Header with avatars */}
       <Card tint="white" className="mt-3 flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          <Avatar variant="mia" size={36} name="mia" />
-          <Avatar variant="jake" size={36} name="jake" className="-ml-2" />
+          {members[0] && (
+            <UserAvatar
+              name={members[0].name}
+              avatarPreset={members[0].avatarPreset}
+              avatarUrl={members[0].avatarUrl}
+              size={36}
+            />
+          )}
+          {members[1] && (
+            <UserAvatar
+              name={members[1].name}
+              avatarPreset={members[1].avatarPreset}
+              avatarUrl={members[1].avatarUrl}
+              size={36}
+              className="-ml-2"
+            />
+          )}
           <span className="hand text-[15px] text-ink ml-1">
-            {couple.names.mia} & {couple.names.jake}
+            {isSolo
+              ? (members[0]?.name ?? "my list")
+              : `${members[0]?.name} & ${members[1]?.name}`}
           </span>
         </div>
         <span className="text-[12px] text-brown/70">
@@ -80,7 +101,7 @@ export default function TodosPage() {
         <h2 className="hand text-[15px] font-semibold text-brown/80">To do</h2>
         <ul className="mt-2 space-y-2">
           {open.map((t) => (
-            <TodoRow key={t.id} todo={t} onToggle={() => toggle(t.id)} />
+            <TodoRow key={t.id} todo={t} onToggle={() => toggle(t.id)} isSolo={isSolo} />
           ))}
         </ul>
       </section>
@@ -98,6 +119,7 @@ export default function TodosPage() {
                 todo={t}
                 onToggle={() => toggle(t.id)}
                 completed
+                isSolo={isSolo}
               />
             ))}
           </ul>
@@ -111,10 +133,12 @@ function TodoRow({
   todo,
   onToggle,
   completed = false,
+  isSolo = false,
 }: {
   todo: Todo;
   onToggle: () => void;
   completed?: boolean;
+  isSolo?: boolean;
 }) {
   const cat = categoryLabels[todo.category];
   return (
@@ -168,7 +192,7 @@ function TodoRow({
                   {todo.due}
                 </span>
               )}
-              <AssigneeChip assignee={todo.assignee} />
+              <AssigneeChip assignee={todo.assignee} isSolo={isSolo} />
               {completed && (
                 <Link
                   href="/new"
@@ -186,7 +210,14 @@ function TodoRow({
   );
 }
 
-function AssigneeChip({ assignee }: { assignee: Todo["assignee"] }) {
+function AssigneeChip({ assignee, isSolo }: { assignee: Todo["assignee"]; isSolo?: boolean }) {
+  if (isSolo) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 border border-border text-[11px] font-semibold text-brown">
+        you
+      </span>
+    );
+  }
   if (assignee === "both") {
     return (
       <span className="inline-flex items-center rounded-full bg-white px-1 py-0.5 border border-border">
@@ -199,9 +230,7 @@ function AssigneeChip({ assignee }: { assignee: Todo["assignee"] }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-white px-1 py-0.5 border border-border">
       <Avatar variant={assignee} size={18} name={assignee} />
-      <span className="pr-1 text-[11px] font-semibold text-brown">
-        {assignee}
-      </span>
+      <span className="pr-1 text-[11px] font-semibold text-brown">{assignee}</span>
     </span>
   );
 }
