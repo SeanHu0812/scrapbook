@@ -11,11 +11,18 @@
 import type * as _smoke from "../_smoke.js";
 import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
+import type * as comments from "../comments.js";
+import type * as dailyQuestions from "../dailyQuestions.js";
+import type * as dev from "../dev.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
+import type * as memories from "../memories.js";
+import type * as questionPool from "../questionPool.js";
+import type * as reactions from "../reactions.js";
 import type * as seed from "../seed.js";
 import type * as seedMutation from "../seedMutation.js";
 import type * as spaces from "../spaces.js";
+import type * as todos from "../todos.js";
 import type * as users from "../users.js";
 
 import type {
@@ -28,11 +35,18 @@ declare const fullApi: ApiFromModules<{
   _smoke: typeof _smoke;
   admin: typeof admin;
   auth: typeof auth;
+  comments: typeof comments;
+  dailyQuestions: typeof dailyQuestions;
+  dev: typeof dev;
   http: typeof http;
   invites: typeof invites;
+  memories: typeof memories;
+  questionPool: typeof questionPool;
+  reactions: typeof reactions;
   seed: typeof seed;
   seedMutation: typeof seedMutation;
   spaces: typeof spaces;
+  todos: typeof todos;
   users: typeof users;
 }>;
 

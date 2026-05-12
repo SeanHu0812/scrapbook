@@ -2,44 +2,59 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Plus, Calendar as CalIcon, Sparkles } from "lucide-react";
+import { Plus, Calendar as CalIcon, Sparkles, Loader2 } from "lucide-react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { PhoneFrame } from "@/components/ui/PhoneFrame";
 import { BackHeader } from "@/components/ui/BackHeader";
 import { Card } from "@/components/ui/Card";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import { Avatar } from "@/components/ui/Avatar";
 import { useSpace } from "@/lib/useSpace";
-import { todos as seed, categoryLabels, type Todo } from "@/lib/data";
+import { categoryLabels } from "@/lib/categories";
+
+type Category = "errand" | "date" | "trip" | "read" | "home";
+
+type ConvexTodo = {
+  _id: Id<"todos">;
+  title: string;
+  notes?: string;
+  assigneeId?: Id<"users">;
+  category: Category;
+  due?: string;
+  done: boolean;
+  createdBy: Id<"users">;
+  createdAt: number;
+  spaceId: Id<"spaces">;
+};
 
 export default function TodosPage() {
-  const { status, members } = useSpace();
+  const { status, members, currentUser } = useSpace();
   const isSolo = status === "solo";
-  const [list, setList] = useState<Todo[]>(seed);
+
+  const todos = useQuery(api.todos.list);
+  const createTodo = useMutation(api.todos.create);
+  const toggleTodo = useMutation(api.todos.toggle);
+  const removeTodo = useMutation(api.todos.remove);
+
   const [newTitle, setNewTitle] = useState("");
+  const [adding, setAdding] = useState(false);
 
-  const open = list.filter((t) => !t.done);
-  const done = list.filter((t) => t.done);
+  const open = (todos ?? []).filter((t) => !t.done);
+  const done = (todos ?? []).filter((t) => t.done);
 
-  function toggle(id: string) {
-    setList((cur) =>
-      cur.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
-  }
-
-  function add() {
+  async function add() {
     if (!newTitle.trim()) return;
-    setList((cur) => [
-      {
-        id: `t${Date.now()}`,
-        title: newTitle.trim(),
-        assignee: "both",
-        category: "home",
-        done: false,
-      },
-      ...cur,
-    ]);
-    setNewTitle("");
+    setAdding(true);
+    try {
+      await createTodo({ title: newTitle.trim(), category: "home" });
+      setNewTitle("");
+    } finally {
+      setAdding(false);
+    }
   }
+
+  const isLoading = todos === undefined;
 
   return (
     <PhoneFrame>
@@ -80,50 +95,77 @@ export default function TodosPage() {
       <div className="mt-3 flex items-center gap-2 rounded-2xl border border-border bg-white px-3 py-2">
         <button
           onClick={add}
+          disabled={adding || !newTitle.trim()}
           aria-label="Add task"
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-pink text-white shadow-sm"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-pink text-white shadow-sm disabled:opacity-60"
         >
-          <Plus className="h-4 w-4" />
+          {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         </button>
         <input
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") add();
-          }}
+          onKeyDown={(e) => { if (e.key === "Enter") add(); }}
           placeholder="add a little task..."
           className="flex-1 bg-transparent text-[14px] text-ink placeholder:text-brown/50 focus:outline-none"
         />
       </div>
 
-      {/* Open list */}
-      <section className="mt-5">
-        <h2 className="hand text-[15px] font-semibold text-brown/80">To do</h2>
-        <ul className="mt-2 space-y-2">
-          {open.map((t) => (
-            <TodoRow key={t.id} todo={t} onToggle={() => toggle(t.id)} isSolo={isSolo} />
+      {isLoading ? (
+        <div className="mt-5 space-y-2 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 rounded-2xl bg-border" />
           ))}
-        </ul>
-      </section>
+        </div>
+      ) : (
+        <>
+          {/* Open list */}
+          {open.length > 0 && (
+            <section className="mt-5">
+              <h2 className="hand text-[15px] font-semibold text-brown/80">To do</h2>
+              <ul className="mt-2 space-y-2">
+                {open.map((t) => (
+                  <TodoRow
+                    key={t._id}
+                    todo={t as ConvexTodo}
+                    onToggle={() => toggleTodo({ id: t._id as Id<"todos"> })}
+                    onRemove={() => removeTodo({ id: t._id as Id<"todos"> })}
+                    isSolo={isSolo}
+                    members={members.map((m) => ({ ...m, avatarPreset: m.avatarPreset ?? undefined, avatarUrl: m.avatarUrl ?? undefined }))}
+                    currentUserId={currentUser?._id}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
 
-      {/* Completed */}
-      {done.length > 0 && (
-        <section className="mt-6">
-          <h2 className="hand text-[15px] font-semibold text-brown/80">
-            Done together
-          </h2>
-          <ul className="mt-2 space-y-2">
-            {done.map((t) => (
-              <TodoRow
-                key={t.id}
-                todo={t}
-                onToggle={() => toggle(t.id)}
-                completed
-                isSolo={isSolo}
-              />
-            ))}
-          </ul>
-        </section>
+          {/* Completed */}
+          {done.length > 0 && (
+            <section className="mt-6">
+              <h2 className="hand text-[15px] font-semibold text-brown/80">Done together</h2>
+              <ul className="mt-2 space-y-2">
+                {done.map((t) => (
+                  <TodoRow
+                    key={t._id}
+                    todo={t as ConvexTodo}
+                    onToggle={() => toggleTodo({ id: t._id as Id<"todos"> })}
+                    onRemove={() => removeTodo({ id: t._id as Id<"todos"> })}
+                    completed
+                    isSolo={isSolo}
+                    members={members.map((m) => ({ ...m, avatarPreset: m.avatarPreset ?? undefined, avatarUrl: m.avatarUrl ?? undefined }))}
+                    currentUserId={currentUser?._id}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {todos.length === 0 && (
+            <div className="mt-16 text-center">
+              <p className="handwrite text-[28px] text-coral">nothing here yet</p>
+              <p className="mt-1 hand text-[14px] text-brown/60">add your first little task above ☁️</p>
+            </div>
+          )}
+        </>
       )}
     </PhoneFrame>
   );
@@ -132,15 +174,25 @@ export default function TodosPage() {
 function TodoRow({
   todo,
   onToggle,
+  onRemove,
   completed = false,
   isSolo = false,
+  members,
+  currentUserId,
 }: {
-  todo: Todo;
+  todo: ConvexTodo;
   onToggle: () => void;
+  onRemove: () => void;
   completed?: boolean;
   isSolo?: boolean;
+  members: { userId: string; name: string; avatarPreset?: string; avatarUrl?: string }[];
+  currentUserId?: string;
 }) {
   const cat = categoryLabels[todo.category];
+  const assigneeMember = todo.assigneeId
+    ? members.find((m) => m.userId === todo.assigneeId)
+    : null;
+
   return (
     <li>
       <Card tint="white" className={`p-3 ${completed ? "opacity-60" : ""}`}>
@@ -168,11 +220,7 @@ function TodoRow({
           </button>
 
           <div className="flex-1">
-            <p
-              className={`hand text-[15px] leading-snug text-ink ${
-                todo.done ? "line-through" : ""
-              }`}
-            >
+            <p className={`hand text-[15px] leading-snug text-ink ${todo.done ? "line-through" : ""}`}>
               {todo.title}
             </p>
             {todo.notes && (
@@ -192,10 +240,16 @@ function TodoRow({
                   {todo.due}
                 </span>
               )}
-              <AssigneeChip assignee={todo.assignee} isSolo={isSolo} />
+              <AssigneeChip
+                assigneeId={todo.assigneeId}
+                isSolo={isSolo}
+                assigneeMember={assigneeMember}
+                currentUserId={currentUserId}
+                members={members}
+              />
               {completed && (
                 <Link
-                  href="/new"
+                  href={`/new?prefillTitle=${encodeURIComponent(todo.title)}`}
                   className="ml-auto inline-flex items-center gap-1 rounded-full bg-pink-soft px-2 py-0.5 text-[11px] font-semibold text-coral border border-pink/40"
                 >
                   <Sparkles className="h-3 w-3" />
@@ -210,27 +264,40 @@ function TodoRow({
   );
 }
 
-function AssigneeChip({ assignee, isSolo }: { assignee: Todo["assignee"]; isSolo?: boolean }) {
-  if (isSolo) {
+function AssigneeChip({
+  assigneeId,
+  isSolo,
+  assigneeMember,
+  currentUserId,
+  members,
+}: {
+  assigneeId?: string;
+  isSolo?: boolean;
+  assigneeMember?: { name: string; avatarPreset?: string; avatarUrl?: string } | null;
+  currentUserId?: string;
+  members: { userId: string; name: string; avatarPreset?: string; avatarUrl?: string }[];
+}) {
+  if (isSolo || !assigneeId) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 border border-border text-[11px] font-semibold text-brown">
-        you
+        {isSolo || !assigneeId ? "us" : "you"}
       </span>
     );
   }
-  if (assignee === "both") {
-    return (
-      <span className="inline-flex items-center rounded-full bg-white px-1 py-0.5 border border-border">
-        <Avatar variant="mia" size={18} name="mia" className="border" />
-        <Avatar variant="jake" size={18} name="jake" className="-ml-1.5 border" />
-        <span className="ml-1 pr-1 text-[11px] font-semibold text-brown">us</span>
-      </span>
-    );
-  }
+
+  const label = assigneeId === currentUserId ? "you" : (assigneeMember?.name ?? "them");
+
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-white px-1 py-0.5 border border-border">
-      <Avatar variant={assignee} size={18} name={assignee} />
-      <span className="pr-1 text-[11px] font-semibold text-brown">{assignee}</span>
+    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 border border-border">
+      {assigneeMember && (
+        <UserAvatar
+          name={assigneeMember.name}
+          avatarPreset={assigneeMember.avatarPreset}
+          avatarUrl={assigneeMember.avatarUrl}
+          size={18}
+        />
+      )}
+      <span className="pr-1 text-[11px] font-semibold text-brown">{label}</span>
     </span>
   );
 }

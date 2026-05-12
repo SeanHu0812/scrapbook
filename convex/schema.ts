@@ -79,12 +79,14 @@ export default defineSchema({
     authorId: v.id("users"),
     body: v.string(),
     createdAt: v.number(),
+    photoStorageId: v.optional(v.id("_storage")),
   }).index("by_memory", ["memoryId"]),
 
   reactions: defineTable({
     memoryId: v.id("memories"),
     userId: v.id("users"),
     emoji: v.string(),
+    photoStorageId: v.optional(v.id("_storage")),
   })
     .index("by_memory", ["memoryId"])
     .index("by_memory_user", ["memoryId", "userId"]),
@@ -130,7 +132,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_space", ["spaceId"]),
+    .index("by_space", ["spaceId"])
+    .index("by_question", ["questionId"]),
 
   mediaAssets: defineTable({
     storageId: v.id("_storage"),
@@ -138,5 +141,7 @@ export default defineSchema({
     spaceId: v.id("spaces"),
     kind: v.union(v.literal("photo"), v.literal("audio"), v.literal("avatar")),
     memoryId: v.optional(v.id("memories")),
-  }).index("by_space", ["spaceId"]),
+  })
+    .index("by_space", ["spaceId"])
+    .index("by_memory", ["memoryId"]),
 });

@@ -20,7 +20,8 @@ export function PhotoPlaceholder({
   className = "",
   rounded = "rounded-md",
 }: Props) {
-  const [a, b] = palettes[scene];
+  const safeScene: Scene = scene in palettes ? (scene as Scene) : "couple";
+  const [a, b] = palettes[safeScene];
 
   return (
     <div

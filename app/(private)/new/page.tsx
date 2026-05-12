@@ -1,43 +1,185 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import {
-  Calendar as CalIcon,
-  Pencil,
-  Camera,
-  StickyNote,
-  Smile,
-  Mic,
-  MapPin,
-  ChevronRight,
-} from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useRef, useState, useCallback } from "react";
+import { useMutation } from "convex/react";
+import { Loader2, Calendar as CalIcon, Pencil, Mic, Square, MapPin, X } from "lucide-react";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { PhoneFrame } from "@/components/ui/PhoneFrame";
-import { BackHeader } from "@/components/ui/BackHeader";
 import { Card } from "@/components/ui/Card";
-import { PhotoPlaceholder } from "@/components/ui/PhotoPlaceholder";
-import { Tape } from "@/components/ui/Tape";
+import { LocationSearch } from "@/components/ui/LocationSearch";
+import { PhotoStack, type StackPhoto } from "@/components/ui/PhotoStack";
 import { Sun } from "@/components/decorations";
 
-type Tab = "photo" | "note" | "sticker" | "voice" | "location";
+const SCENES = ["coffee","couple","sunset","flowers","airplane","river"] as const;
 
-const tabs: { id: Tab; label: string; Icon: typeof Camera }[] = [
-  { id: "photo", label: "Photo", Icon: Camera },
-  { id: "note", label: "Note", Icon: StickyNote },
-  { id: "sticker", label: "Sticker", Icon: Smile },
-  { id: "voice", label: "Voice", Icon: Mic },
-  { id: "location", label: "Place", Icon: MapPin },
-];
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+function weekdayOf(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "long" });
+}
+function formatDisplayDate(iso: string) {
+  const [, m, d] = iso.split("-").map(Number);
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return `${months[m - 1]} ${d}, ${iso.slice(0, 4)}`;
+}
+function formatDuration(s: number) {
+  return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+}
+
+type UploadedPhoto = { storageId: Id<"_storage">; previewUrl: string };
 
 export default function NewMemoryPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("photo");
-  const [body, setBody] = useState(
-    "It was such a cozy day!\nWe went to our favorite cafe,\ntook a walk by the river and\nwatched the sunset together. ❤"
-  );
+  const searchParams = useSearchParams();
+  const createMemory = useMutation(api.memories.create);
+  const generateUploadUrl = useMutation(api.users.generateUploadUrl);
+
+  const [body, setBody] = useState("");
+  const [title, setTitle] = useState(searchParams.get("prefillTitle") ?? "");
+  const [date, setDate] = useState(searchParams.get("prefillDate") || todayIso());
+  const [location, setLocation] = useState("");
+
+  // Photos — unlimited
+  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Voice
+  const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setUploadingPhoto(true);
+    setError("");
+    try {
+      for (const file of files) {
+        const previewUrl = URL.createObjectURL(file);
+        const uploadUrl = await generateUploadUrl();
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        const { storageId } = await res.json();
+        setPhotos((cur) => [...cur, { storageId, previewUrl }]);
+      }
+    } catch {
+      setError("Photo upload failed. Try again.");
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function removePhoto(storageId: string) {
+    setPhotos((cur) => cur.filter((p) => p.storageId !== storageId));
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunksRef.current = [];
+      const mr = new MediaRecorder(stream);
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+        setAudioBlob(blob);
+        setAudioPreviewUrl(URL.createObjectURL(blob));
+      };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setRecording(true);
+      setRecordingSeconds(0);
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((s) => {
+          if (s >= 59) { stopRecording(); return 60; }
+          return s + 1;
+        });
+      }, 1000);
+    } catch {
+      setError("Microphone access denied.");
+    }
+  }
+
+  const stopRecording = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    mediaRecorderRef.current?.stop();
+    mediaRecorderRef.current = null;
+    setRecording(false);
+  }, []);
+
+  function discardAudio() {
+    if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
+    setAudioBlob(null);
+    setAudioPreviewUrl(null);
+    setRecordingSeconds(0);
+  }
+
+  async function handleSave() {
+    const resolvedTitle =
+      title.trim() ||
+      body.trim().split("\n")[0].slice(0, 40) ||
+      formatDisplayDate(date);
+    if (!resolvedTitle) { setError("Add a title or description."); return; }
+    setError("");
+    setSaving(true);
+    try {
+      let audioStorageId: Id<"_storage"> | undefined;
+      if (audioBlob) {
+        const uploadUrl = await generateUploadUrl();
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": audioBlob.type || "audio/webm" },
+          body: audioBlob,
+        });
+        const { storageId } = await res.json();
+        audioStorageId = storageId;
+      }
+      const scene = photos.length > 0 ? "photo" : SCENES[Math.floor(Math.random() * SCENES.length)];
+      const id = await createMemory({
+        title: resolvedTitle,
+        caption: body.trim().slice(0, 80),
+        body: body.trim(),
+        date,
+        weekday: weekdayOf(date),
+        weather: "sunny",
+        scene,
+        location: location.trim() || undefined,
+        photoStorageIds: photos.map((p) => p.storageId),
+        audioStorageId,
+      });
+      router.replace(`/memory/${id}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+      setSaving(false);
+    }
+  }
+
+  const stackPhotos: StackPhoto[] = photos.map((p) => ({
+    key: p.storageId,
+    src: p.previewUrl,
+    storageId: p.storageId,
+  }));
 
   return (
     <PhoneFrame>
+      {/* Header */}
       <div className="flex items-center justify-between py-2">
         <button
           onClick={() => router.back()}
@@ -46,183 +188,138 @@ export default function NewMemoryPage() {
         >
           <span className="text-xl leading-none">✕</span>
         </button>
-        <h1 className="hand text-[18px] font-semibold tracking-wide text-ink">
-          New memory
-        </h1>
+        <h1 className="hand text-[18px] font-semibold tracking-wide text-ink">New memory</h1>
         <button
-          onClick={() => router.push("/home")}
-          className="rounded-full bg-pink px-5 py-2 text-[14px] font-semibold text-white shadow-[0_6px_14px_-6px_rgba(244,125,142,0.7)]"
+          onClick={handleSave}
+          disabled={saving || uploadingPhoto || recording}
+          className="flex items-center gap-1.5 rounded-full bg-pink px-5 py-2 text-[14px] font-semibold text-white shadow-[0_6px_14px_-6px_rgba(244,125,142,0.7)] disabled:opacity-60"
         >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Save
         </button>
       </div>
 
       {/* Date */}
       <div className="mt-3 flex items-center justify-between text-[14px]">
-        <div className="flex items-center gap-2 text-ink">
+        <label className="relative flex items-center gap-2 text-ink cursor-pointer">
           <CalIcon className="h-4 w-4 text-coral" />
-          <span className="font-semibold">May 18, 2024</span>
-        </div>
+          <span className="font-semibold">{formatDisplayDate(date)}</span>
+          <Pencil className="h-3 w-3 text-coral/50" />
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => e.target.value && setDate(e.target.value)}
+            className="absolute inset-0 opacity-0 w-full cursor-pointer"
+          />
+        </label>
         <div className="flex items-center gap-1 text-brown">
-          Saturday
+          {weekdayOf(date)}
           <Sun className="h-4 w-4" />
         </div>
       </div>
 
-      {/* Prompt */}
-      <div className="mt-5">
-        <div className="flex items-center gap-2">
-          <p className="hand text-[18px] font-semibold">How was our day?</p>
-          <Pencil className="h-4 w-4 text-coral" />
-        </div>
-        <Card tint="white" className="mt-2 p-4">
+      {/* Title */}
+      <div className="mt-4">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Give this memory a title…"
+          maxLength={60}
+          className="w-full bg-transparent hand text-[17px] font-semibold text-ink placeholder:text-brown/40 focus:outline-none"
+        />
+      </div>
+
+      {/* Body */}
+      <div className="mt-3">
+        <Card tint="white" className="p-4">
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            rows={5}
+            rows={4}
             className="w-full resize-none bg-transparent text-[15px] leading-relaxed text-ink placeholder:text-brown/50 focus:outline-none"
-            placeholder="Write what happened..."
+            placeholder="How was our day? (optional)"
           />
         </Card>
       </div>
 
-      {/* Tabs */}
-      <div className="mt-5 grid grid-cols-5 gap-2">
-        {tabs.map(({ id, label, Icon }) => {
-          const active = tab === id;
-          return (
+      {error && <p className="mt-2 hand text-[13px] text-coral">{error}</p>}
+
+      {/* ── Photo section ── */}
+      <div className="mt-6">
+        <p className="hand text-[14px] font-semibold text-brown mb-4">Photos</p>
+        <PhotoStack
+          photos={stackPhotos}
+          onAdd={() => fileInputRef.current?.click()}
+          onRemove={removePhoto}
+          uploading={uploadingPhoto}
+        />
+      </div>
+
+      {/* ── Voice section ── */}
+      <div className="mt-6">
+        <p className="hand text-[14px] font-semibold text-brown mb-3">Voice memo</p>
+        {audioPreviewUrl ? (
+          <div className="rounded-2xl border border-border bg-white p-4 flex flex-col gap-3">
+            <audio src={audioPreviewUrl} controls className="w-full h-8" style={{ colorScheme: "light" }} />
             <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex flex-col items-center gap-1 rounded-2xl border py-2.5 text-[11px] font-semibold transition ${
-                active
-                  ? "border-coral bg-pink-soft text-coral shadow-sm"
-                  : "border-border bg-white text-brown"
-              }`}
+              onClick={discardAudio}
+              className="flex items-center gap-1.5 text-[12px] text-brown/60 hover:text-coral transition self-start"
             >
-              <Icon className="h-5 w-5" strokeWidth={active ? 2.2 : 1.8} />
-              {label}
+              <X className="h-3.5 w-3.5" /> Discard recording
             </button>
-          );
-        })}
-      </div>
-
-      {/* Preview area */}
-      <div className="mt-5">
-        {tab === "photo" && <PhotoPreview />}
-        {tab === "note" && <NotePreview />}
-        {tab === "sticker" && <StickerPreview />}
-        {tab === "voice" && <VoicePreview />}
-        {tab === "location" && <LocationPreview />}
-      </div>
-
-      {/* Location footer */}
-      <div className="mt-6 flex items-center justify-between border-t border-border pt-4 text-[14px]">
-        <div className="flex items-center gap-2 text-brown">
-          <MapPin className="h-4 w-4 text-coral" />
-          Add a location
-        </div>
-        <span className="flex items-center gap-1 font-semibold text-ink">
-          Riverside Cafe <ChevronRight className="h-4 w-4 text-brown" />
-        </span>
-      </div>
-    </PhoneFrame>
-  );
-}
-
-function PhotoPreview() {
-  return (
-    <div className="relative flex items-start gap-3 px-1">
-      <div className="relative">
-        <Tape className="-top-2 left-6" color="yellow" rotate={-10} />
-        <PhotoPlaceholder
-          scene="coffee"
-          className="h-32 w-32 rotate-[-3deg] border-[6px] border-white shadow-[0_8px_18px_-10px_rgba(108,90,78,0.4)]"
-        />
-      </div>
-      <div className="relative -ml-3 mt-4">
-        <Tape className="-top-2 left-6" color="pink" rotate={6} />
-        <PhotoPlaceholder
-          scene="couple"
-          className="h-32 w-32 rotate-[4deg] border-[6px] border-white shadow-[0_8px_18px_-10px_rgba(108,90,78,0.4)]"
-        />
-      </div>
-      <div className="ml-2 mt-3 flex h-24 w-24 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-brown/40 text-center text-[12px] text-brown">
-        + Add
-      </div>
-
-      {/* good day note */}
-      <div className="absolute -bottom-2 left-6 -rotate-6 rounded-md bg-white px-3 py-2 shadow-md border border-border">
-        <p className="handwrite text-[18px] leading-tight text-ink">
-          good
-          <br />
-          day <span className="text-coral">☺</span>
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function NotePreview() {
-  return (
-    <Card tint="yellow" className="p-4">
-      <p className="hand text-[15px] leading-relaxed text-ink">
-        Notes appear like little sticky notes inside your memory. Try this:
-        what made you laugh today?
-      </p>
-    </Card>
-  );
-}
-
-function StickerPreview() {
-  const stickers = ["🌷", "🌼", "💗", "✨", "☁️", "🌿", "🍰", "✈️", "📚", "🌙"];
-  return (
-    <Card tint="white" className="p-4">
-      <p className="hand text-[14px] font-semibold text-brown">Tap a sticker</p>
-      <div className="mt-2 grid grid-cols-5 gap-2">
-        {stickers.map((s) => (
+          </div>
+        ) : recording ? (
+          <div className="flex items-center justify-between rounded-2xl border-2 border-coral bg-pink-soft px-5 py-4">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-coral animate-pulse" />
+              <span className="hand text-[15px] font-semibold text-coral">{formatDuration(recordingSeconds)}</span>
+            </div>
+            <button
+              onClick={stopRecording}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-coral text-white shadow-md"
+            >
+              <Square className="h-4 w-4 fill-white" />
+            </button>
+          </div>
+        ) : (
           <button
-            key={s}
-            className="flex h-12 items-center justify-center rounded-2xl border border-border bg-pink-soft text-2xl transition hover:scale-105"
+            onClick={startRecording}
+            className="flex w-full items-center gap-3 rounded-2xl border-2 border-dashed border-brown/40 px-5 py-4 text-brown/60 hover:border-coral hover:text-coral transition"
           >
-            {s}
+            <Mic className="h-5 w-5 shrink-0" />
+            <span className="hand text-[14px] font-semibold">Tap to record (up to 60s)</span>
           </button>
-        ))}
+        )}
       </div>
-    </Card>
-  );
-}
 
-function VoicePreview() {
-  return (
-    <Card tint="pink" className="p-4">
-      <div className="flex items-center gap-3">
-        <button className="flex h-12 w-12 items-center justify-center rounded-full bg-coral text-white shadow-md">
-          <Mic className="h-5 w-5" />
-        </button>
-        <div className="flex-1">
-          <p className="hand text-[15px] text-ink">Tap to record</p>
-          <p className="text-[12px] text-brown/80">Up to 60 seconds</p>
-        </div>
-        <span className="text-[13px] font-semibold text-coral">0:00</span>
+      {/* ── Location section ── */}
+      <div className="mt-6">
+        <p className="hand text-[14px] font-semibold text-brown mb-3">Location</p>
+        {location ? (
+          <div className="flex items-center justify-between rounded-2xl border border-border bg-white px-4 py-3 text-[14px]">
+            <span className="flex items-center gap-2 font-semibold text-ink">
+              <MapPin className="h-4 w-4 text-coral shrink-0" />
+              {location}
+            </span>
+            <button onClick={() => setLocation("")} className="text-brown/50 hover:text-coral ml-2 shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <LocationSearch value={location} onChange={setLocation} />
+        )}
       </div>
-    </Card>
-  );
-}
 
-function LocationPreview() {
-  return (
-    <Card tint="blue" className="p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-coral border border-border">
-          <MapPin className="h-5 w-5" />
-        </div>
-        <div className="flex-1">
-          <p className="hand text-[15px] text-ink">Riverside Cafe</p>
-          <p className="text-[12px] text-brown/80">12 Linden Way · 0.4 mi</p>
-        </div>
-        <button className="text-[13px] font-semibold text-coral">Change</button>
-      </div>
-    </Card>
+      <div className="pb-10" />
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handlePhotoSelect}
+      />
+    </PhoneFrame>
   );
 }

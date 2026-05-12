@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import React from "react";
 import { Settings, ChevronRight, MapPin, Music2 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { useSpace } from "@/lib/useSpace";
 import { PhoneFrame } from "@/components/ui/PhoneFrame";
 import { BottomNav } from "@/components/ui/BottomNav";
@@ -9,10 +12,11 @@ import { Card } from "@/components/ui/Card";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { PhotoPlaceholder } from "@/components/ui/PhotoPlaceholder";
 import { HeartTiny } from "@/components/decorations";
-import { stats, favorites } from "@/lib/data";
 
 export default function ProfilePage() {
   const { status, members } = useSpace();
+  const memories = useQuery(api.memories.list) ?? [];
+  const firstMemory = memories[0] ?? null;
   const isSolo = status === "solo";
   const nameDisplay =
     members.length >= 2
@@ -82,9 +86,9 @@ export default function ProfilePage() {
           Our little stats
         </h2>
         <Card tint="white" className="mt-2 grid grid-cols-3 divide-x divide-border p-3 text-center">
-          <Stat tint="bg-pink-soft" emoji="🎀" value={stats.memories} label="Memories" />
-          <Stat tint="bg-blue-soft" emoji="🖼️" value={stats.photos} label="Photos" />
-          <Stat tint="bg-yellow-soft" emoji="🎙️" value={stats.voiceNotes} label="Voice notes" />
+          <Stat tint="bg-pink-soft" emoji="🎀" value={memories.length} label="Memories" />
+          <Stat tint="bg-blue-soft" emoji="🖼️" value={0} label="Photos" />
+          <Stat tint="bg-yellow-soft" emoji="🎙️" value={0} label="Voice notes" />
         </Card>
       </section>
 
@@ -94,17 +98,26 @@ export default function ProfilePage() {
           Our favorites
         </h2>
         <Card tint="white" className="mt-2 divide-y divide-border">
-          <FavoriteRow
-            leading={
-              <PhotoPlaceholder
-                scene="couple"
-                className="h-10 w-10 rounded-xl"
-              />
-            }
-            title="Favorite memory"
-            sub={favorites.memoryDateLabel}
-            href={`/memory/${favorites.memoryId}`}
-          />
+          {firstMemory ? (
+            <FavoriteRow
+              leading={
+                <PhotoPlaceholder
+                  scene={firstMemory.scene as any}
+                  className="h-10 w-10 rounded-xl"
+                />
+              }
+              title={firstMemory.title}
+              sub={formatDate(firstMemory.date)}
+              href={`/memory/${firstMemory._id}`}
+            />
+          ) : (
+            <FavoriteRow
+              leading={<PhotoPlaceholder scene="couple" className="h-10 w-10 rounded-xl" />}
+              title="Favorite memory"
+              sub="Add your first memory ☁️"
+              href="/new"
+            />
+          )}
           <FavoriteRow
             leading={
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-soft text-coral">
@@ -112,7 +125,7 @@ export default function ProfilePage() {
               </div>
             }
             title="Song of us 🎵"
-            sub={`${favorites.song.title} – ${favorites.song.artist}`}
+            sub="Lovely – Billie Eilish"
           />
           <FavoriteRow
             leading={
@@ -121,7 +134,7 @@ export default function ProfilePage() {
               </div>
             }
             title="Places we love"
-            sub={`${favorites.placesCount} places`}
+            sub="Add locations to memories"
           />
         </Card>
       </section>
@@ -129,6 +142,12 @@ export default function ProfilePage() {
       <BottomNav />
     </PhoneFrame>
   );
+}
+
+function formatDate(iso: string) {
+  const [, m, d] = iso.split("-").map(Number);
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return `${months[m - 1]} ${d}, ${iso.slice(0, 4)}`;
 }
 
 function Stat({
