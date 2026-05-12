@@ -141,7 +141,7 @@ export default function MemoryDetailPage() {
 
       {/* Photos */}
       <div className="mt-5">
-        {memory.photoUrls.length > 0 ? (
+        {memory.photos.length > 0 ? (
           <PhotoStack
             photos={memory.photos.map((p): StackPhoto => ({ key: p.storageId, src: p.url }))}
             onTap={(i) => setLightboxIndex(i)}

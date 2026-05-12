@@ -92,7 +92,6 @@ export default function EditMemoryPage() {
       await updateMemory({
         id: memoryId,
         title: resolvedTitle,
-        caption: body.trim().slice(0, 80),
         body: body.trim(),
         date,
         weekday: weekdayOf(date),

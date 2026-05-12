@@ -65,7 +65,7 @@ export default defineSchema({
     body: v.string(),
     date: v.string(),
     weekday: v.string(),
-    weather: v.union(v.literal("sunny"), v.literal("cloudy"), v.literal("rainy")),
+    weather: v.optional(v.union(v.literal("sunny"), v.literal("cloudy"), v.literal("rainy"))),
     location: v.optional(v.string()),
     stickers: v.optional(v.array(v.string())),
     scene: v.string(),

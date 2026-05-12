@@ -154,11 +154,9 @@ export default function NewMemoryPage() {
       const scene = photos.length > 0 ? "photo" : SCENES[Math.floor(Math.random() * SCENES.length)];
       const id = await createMemory({
         title: resolvedTitle,
-        caption: body.trim().slice(0, 80),
         body: body.trim(),
         date,
         weekday: weekdayOf(date),
-        weather: "sunny",
         scene,
         location: location.trim() || undefined,
         photoStorageIds: photos.map((p) => p.storageId),
