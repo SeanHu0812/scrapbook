@@ -14,6 +14,7 @@ import type * as auth from "../auth.js";
 import type * as comments from "../comments.js";
 import type * as dailyQuestions from "../dailyQuestions.js";
 import type * as dev from "../dev.js";
+import type * as favorites from "../favorites.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as memories from "../memories.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   dailyQuestions: typeof dailyQuestions;
   dev: typeof dev;
+  favorites: typeof favorites;
   http: typeof http;
   invites: typeof invites;
   memories: typeof memories;

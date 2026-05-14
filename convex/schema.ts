@@ -30,12 +30,15 @@ export default defineSchema({
     email: v.string(),
     avatarPreset: v.optional(v.string()),
     avatarStorageId: v.optional(v.id("_storage")),
+    nickname: v.optional(v.string()),
+    birthday: v.optional(v.string()),
   }).index("by_email", ["email"]),
 
   spaces: defineTable({
     name: v.string(),
     createdBy: v.id("users"),
     status: v.union(v.literal("solo"), v.literal("paired")),
+    startDate: v.optional(v.string()),
   }),
 
   memberships: defineTable({
@@ -144,4 +147,16 @@ export default defineSchema({
   })
     .index("by_space", ["spaceId"])
     .index("by_memory", ["memoryId"]),
+
+  spaceFavorites: defineTable({
+    spaceId: v.id("spaces"),
+    memoryId: v.optional(v.id("memories")),
+    photoStorageIds: v.optional(v.array(v.id("_storage"))),
+    songName: v.optional(v.string()),
+    songArtist: v.optional(v.string()),
+    spotifyTrackId: v.optional(v.string()),
+    places: v.optional(v.string()),
+    movie: v.optional(v.string()),
+    activities: v.optional(v.string()),
+  }).index("by_space", ["spaceId"]),
 });

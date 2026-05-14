@@ -1,4 +1,5 @@
-import { query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const mySpace = query({
@@ -43,11 +44,52 @@ export const mySpace = query({
   },
 });
 
-// Placeholder — finalized in M1 #11 / #13
 export const stats = query({
   args: {},
-  handler: async (_ctx) => {
-    return { memoriesCount: 0, todosCount: 0, streak: 0 };
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { memoriesCount: 0, photosCount: 0, voiceNotesCount: 0 };
+
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (!membership) return { memoriesCount: 0, photosCount: 0, voiceNotesCount: 0 };
+
+    const spaceId = membership.spaceId;
+
+    // Count memories — bounded at 10000 for safety; real apps should use a counter
+    const memories = await ctx.db
+      .query("memories")
+      .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+      .take(10000);
+    const memoriesCount = memories.length;
+    const voiceNotesCount = memories.filter((m) => m.audioStorageId != null).length;
+
+    // Count photo assets
+    const photoAssets = await ctx.db
+      .query("mediaAssets")
+      .withIndex("by_space", (q) => q.eq("spaceId", spaceId))
+      .take(10000);
+    const photosCount = photoAssets.filter((a) => a.kind === "photo").length;
+
+    return { memoriesCount, photosCount, voiceNotesCount };
+  },
+});
+
+export const updateStartDate = mutation({
+  args: { startDate: v.string() },
+  handler: async (ctx, { startDate }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const membership = await ctx.db
+      .query("memberships")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (!membership) throw new Error("No space found");
+
+    await ctx.db.patch(membership.spaceId, { startDate });
   },
 });
 

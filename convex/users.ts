@@ -16,11 +16,13 @@ export const updateProfile = mutation({
     name: v.string(),
     avatarPreset: v.optional(v.string()),
     avatarStorageId: v.optional(v.id("_storage")),
+    nickname: v.optional(v.string()),
+    birthday: v.optional(v.string()),
   },
-  handler: async (ctx, { name, avatarPreset, avatarStorageId }) => {
+  handler: async (ctx, { name, avatarPreset, avatarStorageId, nickname, birthday }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-    await ctx.db.patch(userId, { name, avatarPreset, avatarStorageId });
+    await ctx.db.patch(userId, { name, avatarPreset, avatarStorageId, nickname, birthday });
   },
 });
 
